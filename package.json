@@ -1,0 +1,22 @@
+{
+  "name": "vue-cli-plugin-dll",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/brilliantyy/vue-cli-plugin-dll.git"
+  },
+  "keywords": [
+    "vue-cli-plugin"
+  ],
+  "author": "yolanda.yu",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/brilliantyy/vue-cli-plugin-dll/issues"
+  },
+  "homepage": "https://github.com/brilliantyy/vue-cli-plugin-dll#readme"
+}
