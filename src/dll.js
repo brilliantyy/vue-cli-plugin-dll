@@ -1,5 +1,19 @@
 const path = require('path')
-const { merge, isObject, normalizeEntry, getManifestJson } = require('./helper')
+const {
+    merge, 
+    isObject,
+    normalizeEntry,
+    getManifestJson,
+    replaceAsyncName,
+    getAssetHtmlPluginDefaultArg,
+    isAcceptTypeByAssetPluginByPath,
+    compose
+} = require('./helper')
+
+const {
+
+} = require('')
+
 module.exports = class DLL {
     constructor(webpackConfig = {}, dllConfig = {}) {
         this.webpackConfig = webpackConfig
@@ -8,27 +22,13 @@ module.exports = class DLL {
         this.context = webpackConfig.context
         this.isCommand = false
         this.isOpen = false
-        merge(this, DLL.getDefaultConfig())
-        
-        this.dllConfig = merge(DLL.getDLLDefaultConfig(), dllConfig)
-        this.isInject = this.dllConfig.isInject
-
-        this.initEntry()
-        this.initOutputPath()
-        this.initOpen()
-    }
-
-    static getDLLDefaultConfig() {
-        const DEFAULT_OUTPUT_PATH = path.join(this.context, './public', this.outputDir)
-        return {
-            outputPath: DEFAULT_OUTPUT_PATH,
+        this.isInject = false
+        this.defaultDLLConfig = {
             open: true,
-            isInject: true
+            inject: true,
+            cacheFilePath: ''
         }
-    }
-
-    static getDefaultConfig() {
-        return {
+        this.defaultConfig = {
             manifest: '[name].manifest.json',
             // output fileName
             filename: '[name].[hash:8].dll.js',
@@ -37,6 +37,18 @@ module.exports = class DLL {
             // the name of directory specified after output
             outputDir: 'dll'
         }
+        merge(this, this.defaultConfig)
+        this.dllConfig = merge({}, this.defaultDLLConfig, dllConfig)
+
+        this.init()
+    }
+
+    init() {
+        this.initEntry()
+        this.initOutputPath()
+        this.initOpen()
+        this.initInject()
+        this.initCachePath()
     }
 
     initEntry() {
@@ -44,31 +56,45 @@ module.exports = class DLL {
     }
 
     initOutputPath() {
-        let outputPath = this.dllConfig.outputPath
+        let output = this.dllConfig.output
 
-        if (typeof outputPath === 'string') {
-            outputPath = {
-                path: outputPath
+        if (typeof output === 'string') {
+            output = {
+                path: output
             }
         }
 
-        if (outputPath && !isObject(outputPath)) {
-            outputPath = null
+        if (output && !isObject(output)) {
+            output = null
             console.warn('Type check failed for dllconfig\'s outputPath parameter, expected Object or String')
         }
+        const DEFAULT_OUTPUT_PATH = path.join(this.context, './public', this.outputDir)
 
-        if (outputPath && outputPath.path && typeof outputPath.path === 'string') {
-            this.outputPath = outputPath.path
+        if (output && output.path && typeof output.path === 'string') {
+            this.outputPath = output.path
+        } else {
+            this.outputPath = DEFAULT_OUTPUT_PATH
         }
     }
 
     initOpen() {
         const { open } = this.dllConfig
-        this.isOpen = open === true ? this.validateEntry() : false
+        this.isOpen = !!open ? this.validateEntry() : false
     }
 
-    validateEntry(entry = {}) {
-        return !!Object.keys(entry).length
+    initInject() {
+        this.isInject = !!this.dllConfig.inject
+    }
+
+    initCachePath() {
+        let cacheFilePath = this.dllConfig.cacheFilePath
+        if (cacheFilePath) {
+            setCacheFileNamePath(cacheFilePath)
+        }
+    }
+
+    validateEntry() {
+        return !!Object.keys(this.entry).length
     }
 
     callCommand() {
@@ -79,21 +105,22 @@ module.exports = class DLL {
         return path.resolve(this.outputPath, path)
     }
 
-    resolveEetry() {
+    resolveEntry() {
         return JSON.parse(JSON.stringify(this.entry))
     }
 
     resolveOutput() {
         return {
-            path: this.outputDir,
-            fileName: this.fileName,
+            path: this.outputPath,
+            filename: this.filename,
             library: this.library
         }
     }
 
     resolveDllArgs() {
         return [{
-
+            path: this.resolveRelativePath(this.manifest),
+            name: this.library
         }]
     }
 
@@ -113,6 +140,22 @@ module.exports = class DLL {
     }
 
     resolveAddAssetHtmlArgs() {
+        const dllInstance = this
+        const fn = this.resolveRelativePath.bind(this)
+        const sourceList = getCacheFileNameList().map(fn)
 
+        let assetHtmlPluginArg
+        function _(filename) {
+            return getAssetHtmlPluginDefaultArg(filename, dll)
+        }
+
+        if (sourceList.length > 0) {
+            assetHtmlPluginArg = sourceList.filter(isAcceptTypeByAssetPluginByPath)
+            .map(_)
+        } else {
+            console.warn('您更新最新版本，请您重新构建一下dll文件，执行npm run dll')
+            assetHtmlPluginArg = compose(_, fn, replaceAsyncName)(this.filename)
+        }
+        return [assetHtmlPluginArg]
     }
 }
